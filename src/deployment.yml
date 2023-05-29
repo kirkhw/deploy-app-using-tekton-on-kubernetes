@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  labels:
+    app: app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app
+  template:
+    metadata:
+      labels:
+        app: app
+    spec:
+      containers:
+      - name: app
+        image: us.icr.io/manitoulin-icr-ns/hello
+        ports:
+          - containerPort: 3300
+          name: app-port
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-svc
+  labels:
+    app: app-svc
+spec:
+  type: ClusterIP
+  selector:
+    app: app
+  ports:
+    - protocol: TCP
+      name: app-svc
+      port: 8080
+      targetPort: app-port
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-ingress
+  annotations:
+    kubernetes.io/ingress.class: public-iks-k8s-nginx
+spec:
+  rules:
+    - host: manitoulin-3707a539b566dc25d73c0d2da839681b-0000.us-south.containers.appdomain.cloud
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app-svc
+                port:
+                  number: 8080
