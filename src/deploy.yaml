@@ -15,11 +15,11 @@ spec:
         app: app
     spec:
       containers:
-      - name: app
-        image: us.icr.io/manitoulin-icr-ns/hello
-        ports:
-          - containerPort: 3300
-          name: app-port
+        - name: app
+          image: us.icr.io/manitoulin-icr-ns/hello
+          ports:
+            - containerPort: 3300
+              name: app-port
 ---
 apiVersion: v1
 kind: Service
