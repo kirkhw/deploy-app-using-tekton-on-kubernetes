@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: app
-          image: us.icr.io/manitoulin-icr-ns/hello
+          image: us.icr.io/manitoulin-icr-ns/manitoulin-hello-container@sha256:7c3e198b3d9e89ef3ea2b8f3037c1fbee4ba448d0f6da378574b97e503122c08
           ports:
             - containerPort: 3300
               name: app-port
@@ -28,10 +28,15 @@ spec:
             - name: nfsshare
               mountPath: /kirkshare
               subPath: kirkshare
+            - name: smbshare
+              mountPath: /smbshare
       volumes:
         - name: nfsshare
           persistentVolumeClaim:
             claimName: nfs-pvc
+        - name: smbshare
+          persistentVolumeClaim:
+            claimName: smb-pvc
 ---
 apiVersion: v1
 kind: Service
@@ -67,31 +72,3 @@ spec:
                 name: app-svc
                 port:
                   number: 8080
----
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: nfs-pv
-spec:
-  capacity:
-    storage: 5Gi
-  volumeMode: Filesystem
-  accessModes:
-    - ReadWriteOnce
-  nfs:
-    path: /nfsshare
-    server: 10.240.0.8
-  persistentVolumeReclaimPolicy: Retain
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: nfs-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 5Gi
-  volumeName: nfs-pv
-  storageClassName: ""
