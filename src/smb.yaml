@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: smb-share
+  namespace: manitoulin
+# For illustrative purposes only; we should never commit real credentials to Git.
+stringData:
+  username: share
+  password: Sh@reUs3r
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: smb-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  mountOptions:
+    - dir_mode=0777
+    - file_mode=0777
+  csi:
+    driver: smb.csi.k8s.io
+    readOnly: false
+    # volumeHandle format: {smb-server-address}#{sub-dir-name}#{share-name}
+    # make sure this value is unique for every share in the cluster
+    volumeHandle: 10.240.0.8##share
+    volumeAttributes:
+      source: "//10.240.0.8/share"
+    nodeStageSecretRef:
+      name: smb-share
+      namespace: manitoulin
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: smb-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  volumeName: smb-pv
+  storageClassName: ""
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  labels:
+    app: app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app
+  template:
+    metadata:
+      labels:
+        app: app
+    spec:
+      containers:
+        - name: app
+          image: us.icr.io/manitoulin-icr-ns/manitoulin-hello-container@sha256:7c3e198b3d9e89ef3ea2b8f3037c1fbee4ba448d0f6da378574b97e503122c08
+          ports:
+            - containerPort: 3300
+              name: app-port
+          volumeMounts:
+            # a mount for site-data
+            - name: nfsshare
+              mountPath: /nfsshare
+              # subPath: html
+            - name: nfsshare
+              mountPath: /kirkshare
+              subPath: kirkshare
+            - name: smbshare
+              mountPath: /smbshare
+      volumes:
+        - name: nfsshare
+          persistentVolumeClaim:
+            claimName: nfs-pvc
+        - name: smbshare
+          persistentVolumeClaim:
+            claimName: smb-pvc
