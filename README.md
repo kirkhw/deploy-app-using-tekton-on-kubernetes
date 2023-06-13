@@ -1,5 +1,98 @@
+# NFS and SMB Persistent Volume Pilot
 
-# Build and deploy a hello-world application on Kubernetes
+## Samba server
+
+Samba (SMB server) is installed and configured on manitoulin-vsi (10.240.0.8).
+
+```
+# 1. Install Samba.
+sudo apt install samba
+
+# 2. Configure Samba.
+sudo vi /etc/samba/smb.conf
+
+# 3. Add share user and Samba password (use the same password for both: Sh@reUs3r).
+sudo adduser --no-create-home --shell /usr/sbin/nologin share
+sudo smbpasswd -a share
+
+# 4. Validate configuration and restart to pick it up.
+testparm -s
+sudo systemctl restart smbd.service nmbd.service
+```
+
+Configuration for two shares, one as share user and one as guest.
+Add these to the bottom of `smb.conf` in step 2.
+Note: `create mask` lines are commented out for now.
+
+```
+[share]
+   comment = Protected File Share
+   path = /srv/samba/share
+   read only = no
+   valid users = @share
+;   create mask = 0755
+
+[public]
+   comment = Public File Share
+   path = /srv/samba/public
+   guest ok = yes
+   read only = no
+;   create mask = 0755
+```
+
+Check connections to the server. You can use netstat or smbstatus.
+
+```
+netstat -an | grep '139\|445'
+sudo smbstatus
+```
+
+References:
+- https://ubuntu.com/server/docs/samba-file-server
+- https://wiki.samba.org/index.php/Setting_up_Samba_as_a_Standalone_Server
+- https://www.samba.org/samba/docs/current/man-html/smb.conf.5.html
+- https://www.samba.org/samba/docs/using_samba/ch08.html
+
+## SMB clients
+
+To test the SMB server, you can access the shares from manitoulin-vsi-2 (10.240.0.9).
+
+```
+# 1. Install smbclient and SMB (a.k.a CIFS) mount support.
+sudo apt install smbclient cifs-utils
+
+# 2. Connect to the shares using smbclient (similar to ftp).
+smbclient -U guest% //10.240.0.8/public
+smbclient -U share%Sh@reUs3r //10.240.0.8/share
+
+# 3. Mount the shares with cifs mount type.
+sudo mkdir /smbshare /smbpublic
+sudo mount -t cifs -o user=share,pass=Sh@reUs3r //10.240.0.8/share /smbshare
+sudo mount -t cifs -o user=guest,pass= //10.240.0.8/public /smbpublic
+```
+
+## SMB CSI driver for Kubernetes
+
+Install the SMB CSI driver from the Helm chart.
+You must use the custom values file because IKS uses a non-standard kubelet path.
+
+```
+helm repo add csi-driver-smb https://raw.githubusercontent.com/kubernetes-csi/csi-driver-smb/master/charts
+helm install csi-driver-smb csi-driver-smb/csi-driver-smb -n kube-system -f csi-driver-smb/values-iks.yaml --version v1.11.0
+```
+
+Version 1.11.0 was the lastest version of the chart when the pilot was completed.
+There is no reason to expect that future versions would not work.
+
+References:
+- https://github.com/kubernetes-csi/csi-driver-smb
+- https://github.com/kubernetes-csi/csi-driver-smb/tree/master/charts
+- https://github.com/kubernetes-csi/csi-driver-smb/blob/master/docs/csi-debug.md
+
+---
+## Build and deploy a hello-world application on Kubernetes
+
+https://github.com/IBM/deploy-app-using-tekton-on-kubernetes
 
 Container-based software development is growing. Since it's easy to replicate the environment, developers generally create applications on their desktop, and debug and test them locally. Later they build and deploy the application to a Kubernetes cluster. 
 
@@ -379,5 +472,3 @@ Tekton is one of the tools available in the open source project Kabanero. [Kaban
 * [Kabanero: Development tools and runtimes powering IBM Cloud Pak for Applications](https://www.ibm.com/cloud/blog/kabanero-microservices-cloud-native-apps-faster)
 * [Codewind Tutorial](https://developer.ibm.com/tutorials/develop-a-cloud-native-java-application-using-codewind/)
 * [Appsody Overview](https://developer.ibm.com/articles/customizing-appsody/)
-
-
